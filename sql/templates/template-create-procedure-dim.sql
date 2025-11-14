@@ -1,4 +1,4 @@
-USE dw
+USE {REPLACE_VALUE_DATABASE_NAME}
 GO
 
 CREATE PROCEDURE [dbo].[usp_action_table]
@@ -21,7 +21,7 @@ CREATE PROCEDURE [dbo].[usp_action_table]
 AS
 
 DECLARE @v_start_time DATETIME = GETDATE()
-EXEC [admin].usp_update_default_dimension_member @schema = 'dbo', @table = '{replace_value_target_table_name}';
+EXEC [admin].usp_update_default_dimension_member @schema = '{REPLACE_VALUE_TARGET_SCHEMA_NAME}', @table = '{REPLACE_VALUE_TARGET_TABLE_NAME}';
 
 SET XACT_ABORT ON;
 BEGIN TRY
@@ -39,7 +39,7 @@ BEGIN
     DECLARE @user_id varchar(100) = SYSTEM_USER
     DECLARE @machinename nvarchar(100) = @@SERVERNAME
     SET @execution_guid = '{' + CAST(NEWID() AS varchar(100)) + '}'
-    INSERT INTO edw.admin.etl_audit (packagename, machinename, package_id, sproc_name, userid, execution_guid, start_time)
+    INSERT INTO admin.etl_audit (packagename, machinename, package_id, sproc_name, userid, execution_guid, start_time)
     VALUES ('Manual', @machinename, -1, @sproc_name, @user_id, @execution_guid, @v_start_time);
 END
 
@@ -93,11 +93,27 @@ DECLARE @CurrentDateTime DATETIME = GETDATE();     /* set current date/time for 
     TYPE 1 UPDATE & NEW MEMBERS
 ****************************************************/
 
-MERGE INTO edw.dbo.{REPLACE_VALUE_TARGET_TABLE_NAME} AS tgt            /* change name of target table to reflect destination */
+MERGE INTO {REPLACE_VALUE_TARGET_SCHEMA_NAME}.{REPLACE_VALUE_TARGET_TABLE_NAME} AS tgt            /* change name of target table to reflect destination */
 USING #{REPLACE_VALUE_TARGET_TABLE_NAME} AS src                        /* change name of temp table to reflect temp table above */
     ON src.nk_hash = tgt.nk_hash
 WHEN NOT MATCHED THEN 
-    INSERT VALUES (
+    INSERT (
+------ insert columns for insert -------         
+     column1
+    ,column2    
+----------------------------------------
+/* Audit and hashing columns */
+    ,type1_hash
+    ,type2_hash    
+    ,effective_start_datetime
+    ,effective_end_datetime
+    ,is_current
+
+    ,nk_hash
+    ,last_updated_datetime
+    ,load_datetime
+    )
+    VALUES (
 ------ insert columns for insert -------         
      src.column1
     ,src.column2    
@@ -105,10 +121,10 @@ WHEN NOT MATCHED THEN
 /* Audit and hashing columns */
     ,src.type1_hash
     ,src.type2_hash    
-    ,'1900-01-01'
+    ,@CurrentDateTime
     ,'9999-12-31'
     ,1
-    
+
     ,src.nk_hash
     ,@CurrentDateTime
     ,@CurrentDateTime
@@ -138,7 +154,7 @@ SELECT
      tgt.{REPLACE_VALUE_SURROGATE_KEY_NAME} --Surrogate key of record to be expired
     ,src.* --All columns from incoming data
 INTO #type2
-FROM edw.dbo.{REPLACE_VALUE_TARGET_TABLE_NAME} tgt
+FROM {REPLACE_VALUE_TARGET_SCHEMA_NAME}.{REPLACE_VALUE_TARGET_TABLE_NAME} tgt
 JOIN #{REPLACE_VALUE_TARGET_TABLE_NAME} src
     ON tgt.nk_hash = src.nk_hash
 WHERE tgt.is_current = 1 AND tgt.type2_hash <> src.type2_hash;
@@ -150,12 +166,12 @@ SET
     ,tgt.effective_end_datetime = @CurrentDateTime
     ,tgt.last_updated_datetime = @CurrentDateTime
 OUTPUT 'UPDATE' INTO #merge_output
-FROM edw.dbo.{REPLACE_VALUE_TARGET_TABLE_NAME} tgt
+FROM {REPLACE_VALUE_TARGET_SCHEMA_NAME}.{REPLACE_VALUE_TARGET_TABLE_NAME} tgt
 JOIN #type2 src
     ON tgt.{REPLACE_VALUE_SURROGATE_KEY_NAME} = src.{REPLACE_VALUE_SURROGATE_KEY_NAME};
 
 /* Add new member */
-INSERT INTO edw.dbo.{REPLACE_VALUE_TARGET_TABLE_NAME} (
+INSERT INTO {REPLACE_VALUE_TARGET_SCHEMA_NAME}.{REPLACE_VALUE_TARGET_TABLE_NAME} (
 ------ insert columns for update -------
      column1
     ,column2
@@ -204,7 +220,7 @@ FROM #merge_output
 GROUP BY action_type;
 
 
-UPDATE edw.admin.etl_audit
+UPDATE admin.etl_audit
      SET update_count = (SELECT cnt FROM #audit_counts WHERE action_type = 'UPDATE')
         ,insert_count = (SELECT cnt FROM #audit_counts WHERE action_type = 'INSERT')
         ,end_time = CASE WHEN @sproc_name IS NOT NULL THEN GETDATE() ELSE end_time END -- update end_time only if USP is run manually
