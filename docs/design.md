@@ -10,15 +10,17 @@ The sea represents the vast ocean of data in the world. Our job is to go out int
 **Land Components**
 - **Databases:** Where the cargo is held and stored. Needs to be organized, clean, and able to take account for what is there. 
 
+The database component will have multiple layers. Each layer can be a schema within the database, or separate databases themselves. (might need to be reviewed for architecture decsion).
+Each layer will filter just like a sieve down the raw, unfiltered data into clean data that can be used to service analytic workloads or other application operations.
+
+1. **raw (docks):** First landfall where ships unload exactly what they gathered; minimal processing, heavy auditing and quarantine space for bad cargo.
+1. **stg (inspection yard):** Customs agents validate manifests, remove obvious duplicates, standardize packaging, and tag rows with lineage.
+1. **core (warehouses):** Clean pallets arranged by business grain; constraints keep stacks stable, conformed dimensions bundle shared descriptors.
+1. **serv (market stalls):** Curated shelves for consumers; marts, exports, and APIs arranged for quick pickup with clear SLAs.
+
 **Sea Components**
 - **Connectors:** Ports where ships dock and can load or unload cargo.
 - **Pipelines** Boats that carry the cargo from the sea to the land.
-
-## Layer Model
-- **raw (docks):** First landfall where ships unload exactly what they gathered; minimal processing, heavy auditing and quarantine space for bad cargo.
-- **stg (inspection yard):** Customs agents validate manifests, remove obvious duplicates, standardize packaging, and tag rows with lineage.
-- **core (warehouses):** Clean pallets arranged by business grain; constraints keep stacks stable, conformed dimensions bundle shared descriptors.
-- **serv (market stalls):** Curated shelves for consumers; marts, exports, and APIs arranged for quick pickup with clear SLAs.
 
 ## Flow from Sea to Land
 - **Departure:** Pipelines fetch cargo on published schedules; captains log sources, contracts, and expected volumes.
